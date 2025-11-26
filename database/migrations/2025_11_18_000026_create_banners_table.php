@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id('banner_id');
             $table->string('title', 255);
             $table->text('subtitle')->nullable();
-            $table->string('image_url_desktop', 255);
-            $table->string('image_url_mobile', 255)->nullable();
+            $table->string('image_url', 255);
+            $table->string('position', 50)->default('home_slider')->comment('Vị trí: home_slider, category_top, sidebar...');
             $table->string('target_url', 255)->nullable()->comment('Link khi click vào banner (ví dụ: /collections/milano)');
             $table->integer('sort_order')->default(0);
             $table->boolean('is_active')->default(true);

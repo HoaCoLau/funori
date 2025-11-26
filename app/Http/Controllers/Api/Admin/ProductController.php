@@ -15,7 +15,13 @@ class ProductController extends Controller
      */
     public function index()
     {
-        $products = Product::with(['categories', 'images', 'variants', 'specifications', 'collections'])->paginate(10);
+        $products = Product::with([
+            'categories', 
+            'images', 
+            'variants.attributeValues.attribute', 
+            'specifications', 
+            'collections'
+        ])->paginate(10);
         
         return response()->json([
             'success' => true,
@@ -115,7 +121,13 @@ class ProductController extends Controller
      */
     public function show(string $id)
     {
-        $product = Product::with(['categories', 'images', 'variants', 'specifications', 'collections'])->find($id);
+        $product = Product::with([
+            'categories', 
+            'images', 
+            'variants.attributeValues.attribute', 
+            'specifications', 
+            'collections'
+        ])->find($id);
 
         if (!$product) {
             return response()->json([

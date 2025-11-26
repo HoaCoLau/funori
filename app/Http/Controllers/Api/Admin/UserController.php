@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
@@ -14,29 +14,13 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = User::paginate(10);
-        return response()->json($users);
-    }
+        $users = User::with('role')->paginate(20);
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
-            'first_name' => 'nullable|string|max:100',
-            'last_name' => 'nullable|string|max:100',
-            'role_id' => 'required|exists:roles,role_id',
+        return response()->json([
+            'success' => true,
+            'message' => 'Lấy danh sách người dùng thành công',
+            'data' => UserResource::collection($users)->response()->getData(true)
         ]);
-
-        $validated['password_hash'] = Hash::make($validated['password']);
-        unset($validated['password']);
-
-        $user = User::create($validated);
-
-        return response()->json($user, 201);
     }
 
     /**
@@ -44,13 +28,20 @@ class UserController extends Controller
      */
     public function show(string $id)
     {
-        $user = User::find($id);
+        $user = User::with(['role', 'addresses', 'orders'])->find($id);
 
         if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Không tìm thấy người dùng',
+            ], 404);
         }
 
-        return response()->json($user);
+        return response()->json([
+            'success' => true,
+            'message' => 'Lấy chi tiết người dùng thành công',
+            'data' => new UserResource($user)
+        ]);
     }
 
     /**
@@ -61,19 +52,23 @@ class UserController extends Controller
         $user = User::find($id);
 
         if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Không tìm thấy người dùng',
+            ], 404);
         }
 
         $validated = $request->validate([
-            'email' => 'sometimes|required|email|unique:users,email,' . $id . ',user_id',
-            'first_name' => 'nullable|string|max:100',
-            'last_name' => 'nullable|string|max:100',
-            'role_id' => 'sometimes|required|exists:roles,role_id',
+            'status' => 'required|in:active,blocked',
         ]);
 
-        $user->update($validated);
+        $user->update(['status' => $validated['status']]);
 
-        return response()->json($user);
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật trạng thái người dùng thành công',
+            'data' => new UserResource($user)
+        ]);
     }
 
     /**
@@ -84,11 +79,19 @@ class UserController extends Controller
         $user = User::find($id);
 
         if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Không tìm thấy người dùng',
+            ], 404);
         }
 
+        // Prevent deleting self or admin? Maybe later.
+        
         $user->delete();
 
-        return response()->json(['message' => 'User deleted successfully']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Xóa người dùng thành công',
+        ]);
     }
 }

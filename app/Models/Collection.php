@@ -15,9 +15,15 @@ class Collection extends Model
 
     protected $fillable = [
         'collection_name',
+        'style_id',
         'description',
-        'collection_image',
+        'lifestyle_image',
     ];
+
+    public function style()
+    {
+        return $this->belongsTo(Style::class, 'style_id');
+    }
 
     public function products()
     {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Http\Resources\OrderResource;
 use Illuminate\Http\Request;
 
 class OrderController extends Controller
@@ -11,31 +12,33 @@ class OrderController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $orders = Order::with(['user', 'orderItems'])->paginate(10);
-        return response()->json($orders);
-    }
+        $query = Order::with(['user', 'shippingMethod', 'paymentMethod']);
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'user_id' => 'nullable|exists:users,user_id',
-            'status' => 'required|string|max:50',
-            'shipping_full_name' => 'required|string|max:255',
-            'shipping_phone' => 'required|string|max:20',
-            'shipping_address_line1' => 'required|string|max:255',
-            'shipping_city' => 'required|string|max:100',
-            'subtotal_amount' => 'required|numeric|min:0',
-            'total_amount' => 'required|numeric|min:0',
+        // Filter by status
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by date range
+        if ($request->has('from_date')) {
+            $query->whereDate('order_date', '>=', $request->from_date);
+        }
+        if ($request->has('to_date')) {
+            $query->whereDate('order_date', '<=', $request->to_date);
+        }
+
+        // Sort by newest
+        $query->orderBy('order_date', 'desc');
+
+        $orders = $query->paginate(20);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lấy danh sách đơn hàng thành công',
+            'data' => OrderResource::collection($orders)->response()->getData(true)
         ]);
-
-        $order = Order::create($validated);
-
-        return response()->json($order, 201);
     }
 
     /**
@@ -43,13 +46,20 @@ class OrderController extends Controller
      */
     public function show(string $id)
     {
-        $order = Order::with(['user', 'orderItems'])->find($id);
+        $order = Order::with(['user', 'shippingMethod', 'paymentMethod', 'orderItems'])->find($id);
 
         if (!$order) {
-            return response()->json(['message' => 'Order not found'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Không tìm thấy đơn hàng',
+            ], 404);
         }
 
-        return response()->json($order);
+        return response()->json([
+            'success' => true,
+            'message' => 'Lấy chi tiết đơn hàng thành công',
+            'data' => new OrderResource($order)
+        ]);
     }
 
     /**
@@ -60,33 +70,22 @@ class OrderController extends Controller
         $order = Order::find($id);
 
         if (!$order) {
-            return response()->json(['message' => 'Order not found'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Không tìm thấy đơn hàng',
+            ], 404);
         }
 
         $validated = $request->validate([
-            'status' => 'sometimes|required|string|max:50',
-            'shipping_full_name' => 'sometimes|required|string|max:255',
-            // Add other validations as needed
+            'status' => 'required|in:Pending,Processing,Shipped,Delivered,Cancelled',
         ]);
 
-        $order->update($validated);
+        $order->update(['status' => $validated['status']]);
 
-        return response()->json($order);
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        $order = Order::find($id);
-
-        if (!$order) {
-            return response()->json(['message' => 'Order not found'], 404);
-        }
-
-        $order->delete();
-
-        return response()->json(['message' => 'Order deleted successfully']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật trạng thái đơn hàng thành công',
+            'data' => new OrderResource($order)
+        ]);
     }
 }

@@ -19,6 +19,7 @@ class User extends Model
         'email',
         'phone',
         'password_hash',
+        'status',
     ];
 
     protected $hidden = [

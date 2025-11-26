@@ -24,6 +24,28 @@ class ProductResource extends JsonResource
             'categories' => CategoryResource::collection($this->whenLoaded('categories')),
             'images' => ProductImageResource::collection($this->whenLoaded('images')),
             'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
+            'attributes' => $this->whenLoaded('variants', function () {
+                // Aggregate attributes from all variants
+                $allAttributeValues = $this->variants->flatMap(function ($variant) {
+                    return $variant->attributeValues;
+                });
+
+                // Group by attribute_id to get unique attributes
+                return $allAttributeValues->groupBy('attribute_id')->map(function ($values) {
+                    $firstValue = $values->first();
+                    return [
+                        'id' => $firstValue->attribute_id,
+                        'name' => $firstValue->attribute ? $firstValue->attribute->attribute_name : null,
+                        'values' => $values->unique('value_id')->map(function ($value) {
+                            return [
+                                'id' => $value->value_id,
+                                'name' => $value->value_name,
+                                'swatch_code' => $value->swatch_code,
+                            ];
+                        })->values()->all()
+                    ];
+                })->values()->all();
+            }),
             'specifications' => ProductSpecificationResource::collection($this->whenLoaded('specifications')),
             // Collections resource can be added later if needed, or just simple array for now
             'collections' => $this->whenLoaded('collections', function () {

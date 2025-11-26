@@ -15,6 +15,17 @@ class ProductVariantResource extends JsonResource
             'price' => (float) $this->price,
             'stock_quantity' => $this->stock_quantity,
             'main_image_url' => $this->main_image_url,
+            'attributes' => $this->whenLoaded('attributeValues', function () {
+                return $this->attributeValues->map(function ($av) {
+                    return [
+                        'attribute_id' => $av->attribute_id,
+                        'attribute_name' => $av->attribute ? $av->attribute->attribute_name : null,
+                        'value_id' => $av->value_id,
+                        'value_name' => $av->value_name,
+                        'swatch_code' => $av->swatch_code,
+                    ];
+                });
+            }),
         ];
     }
 }
