@@ -35,7 +35,7 @@ class PaymentController extends Controller
                 "cancel_url" => route('payment.cancel'),
             ],
             "purchase_units" => [
-                0 => [
+                [
                     "amount" => [
                         "currency_code" => "USD",
                         "value" => number_format($order->total_amount / 25000, 2, '.', '') // Assuming 1 USD = 25,000 VND

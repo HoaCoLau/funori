@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\Client\OrderController as ClientOrderController;
 use App\Http\Controllers\Api\Client\WishlistController;
 use App\Http\Controllers\Api\Client\ReviewController as ClientReviewController;
 use App\Http\Controllers\Api\Client\PaymentController;
+use App\Http\Controllers\Api\Client\PostController as ClientPostController;
 
 
 // Admin Routes
@@ -61,6 +62,11 @@ Route::get('/products/{id}/related', [ClientProductController::class, 'related']
 Route::get('/products/{id}/reviews', [ClientReviewController::class, 'index']); // Public reviews
 Route::get('/categories', [ClientCategoryController::class, 'index']);
 Route::get('/categories/{id}', [ClientCategoryController::class, 'show']);
+
+// Client Post Routes
+Route::get('/posts', [ClientPostController::class, 'index']);
+Route::get('/posts/{slug}', [ClientPostController::class, 'show']);
+Route::get('/posts/{id}/related', [ClientPostController::class, 'related']);
 
 // Payment Callback Routes (Public because PayPal redirects here)
 Route::get('/payment/success', [PaymentController::class, 'success'])->name('payment.success');
