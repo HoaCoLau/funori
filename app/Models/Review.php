@@ -22,6 +22,10 @@ class Review extends Model
         'status',
     ];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+    ];
+
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id');

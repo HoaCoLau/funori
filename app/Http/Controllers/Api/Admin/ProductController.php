@@ -5,11 +5,19 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Http\Resources\ProductResource;
+use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
+    protected $fileUploadService;
+
+    public function __construct(FileUploadService $fileUploadService)
+    {
+        $this->fileUploadService = $fileUploadService;
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -47,7 +55,7 @@ class ProductController extends Controller
             'collections' => 'nullable|array',
             'collections.*' => 'exists:collections,collection_id',
             'images' => 'nullable|array',
-            'images.*.image_url' => 'required|string',
+            'images.*.image_url' => 'required', // File or String
             'images.*.alt_text' => 'nullable|string',
             'images.*.sort_order' => 'nullable|integer',
             'images.*.variant_id' => 'nullable|exists:product_variants,variant_id',
@@ -55,7 +63,7 @@ class ProductController extends Controller
             'variants.*.variant_sku' => 'required|string|distinct|unique:product_variants,variant_sku',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.stock_quantity' => 'integer|min:0',
-            'variants.*.main_image_url' => 'nullable|string',
+            'variants.*.main_image_url' => 'nullable', // File or String
             'specifications' => 'nullable|array',
             'specifications.*.spec_name' => 'required|string',
             'specifications.*.spec_value' => 'required|string',
@@ -84,13 +92,27 @@ class ProductController extends Controller
             }
 
             // 4. Create Images
-            if (!empty($validated['images'])) {
-                $product->images()->createMany($validated['images']);
+            if ($request->has('images')) {
+                $images = $request->images;
+                foreach ($images as $key => $imageData) {
+                    if ($request->hasFile("images.{$key}.image_url")) {
+                        $url = $this->fileUploadService->upload($request->file("images.{$key}.image_url"));
+                        $images[$key]['image_url'] = $url;
+                    }
+                }
+                $product->images()->createMany($images);
             }
 
             // 5. Create Variants
-            if (!empty($validated['variants'])) {
-                $product->variants()->createMany($validated['variants']);
+            if ($request->has('variants')) {
+                $variants = $request->variants;
+                foreach ($variants as $key => $variantData) {
+                    if ($request->hasFile("variants.{$key}.main_image_url")) {
+                        $url = $this->fileUploadService->upload($request->file("variants.{$key}.main_image_url"));
+                        $variants[$key]['main_image_url'] = $url;
+                    }
+                }
+                $product->variants()->createMany($variants);
             }
 
             // 6. Create Specifications
@@ -169,7 +191,7 @@ class ProductController extends Controller
             'collections' => 'nullable|array',
             'collections.*' => 'exists:collections,collection_id',
             'images' => 'nullable|array',
-            'images.*.image_url' => 'required|string',
+            'images.*.image_url' => 'required', // File or String
             'images.*.alt_text' => 'nullable|string',
             'images.*.sort_order' => 'nullable|integer',
             'images.*.variant_id' => 'nullable|exists:product_variants,variant_id',
@@ -178,7 +200,7 @@ class ProductController extends Controller
             'variants.*.variant_sku' => 'required_with:variants|string|distinct', // Unique check needs custom logic or ignore
             'variants.*.price' => 'required_with:variants|numeric|min:0',
             'variants.*.stock_quantity' => 'integer|min:0',
-            'variants.*.main_image_url' => 'nullable|string',
+            'variants.*.main_image_url' => 'nullable', // File or String
             'specifications' => 'nullable|array',
             'specifications.*.spec_name' => 'required|string',
             'specifications.*.spec_value' => 'required|string',
@@ -205,15 +227,29 @@ class ProductController extends Controller
             // 4. Update Images (Delete all and recreate strategy for simplicity)
             if ($request->has('images')) {
                 $product->images()->delete();
-                $product->images()->createMany($request->images);
+                $images = $request->images;
+                foreach ($images as $key => $imageData) {
+                    if ($request->hasFile("images.{$key}.image_url")) {
+                        $url = $this->fileUploadService->upload($request->file("images.{$key}.image_url"));
+                        $images[$key]['image_url'] = $url;
+                    }
+                }
+                $product->images()->createMany($images);
             }
 
             // 5. Update Variants (Smart Update: Create, Update, Delete missing)
             if ($request->has('variants')) {
                 $existingVariantIds = $product->variants()->pluck('variant_id')->toArray();
                 $processedVariantIds = [];
+                $variants = $request->variants;
 
-                foreach ($request->variants as $variantData) {
+                foreach ($variants as $key => $variantData) {
+                    // Handle file upload for variant image
+                    if ($request->hasFile("variants.{$key}.main_image_url")) {
+                        $url = $this->fileUploadService->upload($request->file("variants.{$key}.main_image_url"));
+                        $variantData['main_image_url'] = $url;
+                    }
+
                     if (isset($variantData['variant_id'])) {
                         // Case 1: Update existing variant
                         if (in_array($variantData['variant_id'], $existingVariantIds)) {
