@@ -10,7 +10,7 @@ use Aws\S3\S3Client;
 class CleanupImages extends Command
 {
     protected $signature = 'images:cleanup';
-    protected $description = 'Xóa ảnh status=delete và dọn dẹp file rác (An toàn cho dữ liệu lớn)';
+    protected $description = 'Xóa ảnh status=delete và dọn dẹp file rác (Tối ưu tốc độ)';
 
     public function handle()
     {
@@ -29,13 +29,12 @@ class CleanupImages extends Command
         ]);
         $bucket = env('AWS_BUCKET');
 
-        $this->info('Bắt đầu quy trình dọn dẹp...');
-
-        // --- PHẦN 1: Xóa ảnh status='delete' (Dùng chunkById để tránh tràn RAM và lỗi SQL) ---
-        // Lấy từng gói 1000 bản ghi để xử lý
-        $countDeleted = 0;
+        // --- PHẦN 1: Xóa ảnh status='delete' (Xử lý hàng loạt) ---
+        $images = ProductImage::where('status', 'delete')->get();
         
-        ProductImage::where('status', 'delete')->chunkById(1000, function ($images) use ($s3, $bucket, &$countDeleted) {
+        if ($images->isNotEmpty()) {
+            $this->info('Tìm thấy ' . $images->count() . ' ảnh cần xóa.');
+            
             $s3KeysToDelete = [];
             $localFilesToDelete = [];
             $idsToDelete = [];
@@ -52,18 +51,23 @@ class CleanupImages extends Command
                     $localFilesToDelete[] = $image->temporary_url;
                 }
 
-                $idsToDelete[] = $image->image_id;
+                $idsToDelete[] = $image->image_id; // Hoặc $image->id tùy model
             }
 
-            // 1. Xóa R2 (Batch Delete)
+            // 1. Xóa R2 (Batch Delete - Tối đa 1000 key/request)
             if (!empty($s3KeysToDelete)) {
-                try {
-                    $s3->deleteObjects([
-                        'Bucket' => $bucket,
-                        'Delete' => ['Objects' => $s3KeysToDelete],
-                    ]);
-                } catch (\Exception $e) {
-                    $this->error("Lỗi xóa R2: " . $e->getMessage());
+                // Chia nhỏ mảng nếu > 1000 item (giới hạn của S3)
+                $chunks = array_chunk($s3KeysToDelete, 1000);
+                foreach ($chunks as $chunk) {
+                    try {
+                        $s3->deleteObjects([
+                            'Bucket' => $bucket,
+                            'Delete' => ['Objects' => $chunk],
+                        ]);
+                        $this->info("Đã gửi lệnh xóa " . count($chunk) . " file trên R2.");
+                    } catch (\Exception $e) {
+                        $this->error("Lỗi xóa Batch R2: " . $e->getMessage());
+                    }
                 }
             }
 
@@ -72,28 +76,22 @@ class CleanupImages extends Command
                 Storage::disk('public')->delete($localFilesToDelete);
             }
 
-            // 3. Xóa Database (Batch Delete - An toàn vì chỉ có 1000 ID)
+            // 3. Xóa Database (1 Query duy nhất)
             ProductImage::whereIn('image_id', $idsToDelete)->delete();
-
-            $countDeleted += count($idsToDelete);
-            $this->info("Đã xử lý xong gói " . count($idsToDelete) . " ảnh...");
-        });
-
-        if ($countDeleted > 0) {
-            $this->info("TỔNG CỘNG: Đã xóa $countDeleted ảnh khỏi Database và Cloud.");
-        } else {
-            $this->info("Không có ảnh nào cần xóa trong Database.");
+            
+            $this->info("Đã dọn sạch Database.");
         }
 
-        // --- PHẦN 2: Quét file rác (Giữ nguyên logic tối ưu RAM) ---
-        $this->info('Đang quét file rác hệ thống...');
+        // --- PHẦN 2: Quét file rác (Tối ưu thuật toán) ---
+        $this->info('Đang quét file rác...');
         
         $files = Storage::disk('public')->files('temp_images');
         
-        // Lấy danh sách file đang dùng (Chỉ lấy cột temporary_url để tiết kiệm RAM)
+        // Lấy TẤT CẢ temporary_url đang được sử dụng ra RAM (dạng Hash Map để tra cứu cực nhanh)
+        // Thay vì query DB 1000 lần, ta chỉ query 1 lần.
         $activeFiles = ProductImage::whereNotNull('temporary_url')
             ->pluck('temporary_url')
-            ->flip()
+            ->flip() // Đảo key-value để dùng isset() cho nhanh
             ->toArray();
 
         $filesToDelete = [];
@@ -103,26 +101,27 @@ class CleanupImages extends Command
         foreach ($files as $file) {
             if (str_ends_with($file, '.gitignore')) continue;
 
-            if (isset($activeFiles[$file])) continue;
+            // Kiểm tra nhanh trong RAM: File này có đang được dùng không?
+            if (isset($activeFiles[$file])) {
+                continue; // Đang dùng -> Bỏ qua ngay
+            }
 
+            // Nếu không dùng -> Kiểm tra thời gian
             $lastModified = Storage::disk('public')->lastModified($file);
             if (($now - $lastModified) > $ttl) {
                 $filesToDelete[] = $file;
             }
         }
 
-        // Chia nhỏ mảng file rác để xóa nếu quá nhiều (tránh lỗi quá giới hạn tham số)
+        // Xóa hàng loạt file rác
         if (!empty($filesToDelete)) {
-            $chunks = array_chunk($filesToDelete, 1000);
-            foreach ($chunks as $chunk) {
-                Storage::disk('public')->delete($chunk);
-                $this->info("Đã xóa " . count($chunk) . " file rác local.");
-            }
+            Storage::disk('public')->delete($filesToDelete);
+            $this->info("Đã xóa " . count($filesToDelete) . " file rác.");
         } else {
             $this->info("Không có file rác nào.");
         }
 
         $duration = round(microtime(true) - $start, 2);
-        $this->info("Hoàn tất toàn bộ trong {$duration} giây.");
+        $this->info("Hoàn tất trong {$duration} giây.");
     }
 }
