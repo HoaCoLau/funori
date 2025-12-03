@@ -91,9 +91,9 @@ async function processSingleImage(image) {
 
 async function processImages() {
     try {
-        // Lấy 10 ảnh
+        // Lấy ảnh
         const [rows] = await pool.execute(
-            "SELECT image_id, temporary_url, image_url FROM product_images WHERE status = 'temporary' AND temporary_url IS NOT NULL LIMIT 10"
+            "SELECT image_id, temporary_url, image_url FROM product_images WHERE status = 'temporary' AND temporary_url IS NOT NULL LIMIT 10000"
         );
 
         if (rows.length === 0) {
