@@ -251,27 +251,31 @@ class ProductController extends Controller
                         $imageRecord = $product->images()->where('image_id', $imgId)->first();
                         
                         if ($imageRecord) {
-                            $updateData = [
-                                'alt_text' => $imgData['alt_text'] ?? $imageRecord->alt_text,
-                                'sort_order' => $imgData['sort_order'] ?? $imageRecord->sort_order,
-                            ];
-
-                            // Nếu có gửi file mới đè lên ảnh cũ
+                            // Nếu có gửi file mới -> XÓA CŨ + TẠO MỚI (Soft Replace)
                             if (isset($imgData['image_url']) && $imgData['image_url'] instanceof UploadedFile) {
-                                // 1. Lưu file mới vào temp
+                                // 1. Đánh dấu ảnh cũ là DELETE (để Cron Job dọn dẹp sạch sẽ trên R2)
+                                $imageRecord->update(['status' => 'delete']);
+
+                                // 2. Tạo ảnh mới hoàn toàn (ID mới)
                                 $file = $imgData['image_url'];
                                 $localPath = $file->store('temp_images', 'public');
 
-                                // 2. Cập nhật record để Worker xử lý file mới
-                                $updateData['image_url'] = null; // Reset link R2 cũ
-                                $updateData['temporary_url'] = $localPath;
-                                $updateData['status'] = 'temporary'; // Kích hoạt Worker
-
-                                // (Tùy chọn) Nếu muốn xóa file cũ trên R2 ngay thì làm ở đây, 
-                                // nhưng tốt nhất để Cron Job lo việc dọn dẹp các file mồ côi sau này.
+                                $product->images()->create([
+                                    'image_url' => null,
+                                    'temporary_url' => $localPath,
+                                    'status' => 'temporary', // Worker sẽ xử lý
+                                    'alt_text' => $imgData['alt_text'] ?? $imageRecord->alt_text,
+                                    'sort_order' => $imgData['sort_order'] ?? $imageRecord->sort_order,
+                                    'is_thumbnail' => $imgData['is_thumbnail'] ?? 0,
+                                ]);
+                            } 
+                            // Nếu KHÔNG gửi file mới -> Chỉ update thông tin
+                            else {
+                                $imageRecord->update([
+                                    'alt_text' => $imgData['alt_text'] ?? $imageRecord->alt_text,
+                                    'sort_order' => $imgData['sort_order'] ?? $imageRecord->sort_order,
+                                ]);
                             }
-
-                            $imageRecord->update($updateData);
                         }
                     } 
                     // Case 2: New Image (No ID, has File) -> Async Upload
