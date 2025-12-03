@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Http\Resources\ProductResource;
 use App\Services\FileUploadService;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
@@ -93,14 +94,16 @@ class ProductController extends Controller
 
             // 4. Create Images
             if ($request->has('images')) {
-                $images = $request->images;
-                foreach ($images as $key => $imageData) {
-                    if ($request->hasFile("images.{$key}.image_url")) {
-                        $url = $this->fileUploadService->upload($request->file("images.{$key}.image_url"));
-                        $images[$key]['image_url'] = $url;
+                foreach ($request->images as $imgData){
+                    if (isset($imgData['image_url']) && $imgData['image_url'] instanceof UploadedFile ) {
+                        $file = $imgData['image_url'];
+                        $localPath = $file->store('temp_images', 'public');
+                        $imgData['temporary_url']=$localPath;
+                        $imgData['image_url']=null;
+                        $imgData['status']='temporary';
                     }
+                    $product->images()->create($imgData);
                 }
-                $product->images()->createMany($images);
             }
 
             // 5. Create Variants
@@ -309,20 +312,13 @@ class ProductController extends Controller
      */
     public function destroy(string $id)
     {
-        $product = Product::find($id);
+        $image = ProductImage::findOrFail($id);
 
-        if (!$product) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy sản phẩm',
-            ], 404);
-        }
-
-        $product->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Xóa sản phẩm thành công',
+        $image->update([
+        'status' => 'delete'
         ]);
+
+        return response()->json(['message' => 'Ảnh đã được đánh dấu xóa']);
+
     }
 }
