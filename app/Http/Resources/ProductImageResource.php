@@ -11,9 +11,7 @@ class ProductImageResource extends JsonResource
     {
         return [
             'id' => $this->image_id,
-            'image_url' => $this->status === 'temporary' 
-                ? asset('storage/' . $this->temporary_url) 
-                : $this->image_url,
+            'image_url' => $this->image_url,
             'alt_text' => $this->alt_text,
             'sort_order' => $this->sort_order,
             'variant_id' => $this->variant_id,

@@ -92,16 +92,10 @@ services:
         build:
             context: ./upload-service
             dockerfile: Dockerfile
-        volumes:
-            - './storage/app/public:/var/www/html/storage/app/public'
-            - './upload-service:/app' 
         ports:
             - '3000:3000'
         environment:
-            LARAVEL_STORAGE_PATH: '/var/www/html/storage/app/public'
-            DB_HOST: 'mysql'
             PORT: 3000
-            AWS_URL: '${AWS_URL}'
             AWS_ACCESS_KEY_ID: '${AWS_ACCESS_KEY_ID}'
             AWS_SECRET_ACCESS_KEY: '${AWS_SECRET_ACCESS_KEY}'
             AWS_BUCKET: '${AWS_BUCKET}'
