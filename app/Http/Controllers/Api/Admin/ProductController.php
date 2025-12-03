@@ -227,67 +227,17 @@ class ProductController extends Controller
                 $product->collections()->sync($request->collections);
             }
 
-            // 4. Update Images (Async Logic)
+            // 4. Update Images (Delete all and recreate strategy for simplicity)
             if ($request->has('images')) {
-                $incomingImages = $request->images;
-                
-                // Get IDs of images to keep
-                $keepImageIds = collect($incomingImages)
-                    ->map(fn($img) => $img['image_id'] ?? ($img['id'] ?? null))
-                    ->filter()
-                    ->toArray();
-
-                // A. Mark images for deletion (those in DB but not in request)
-                $product->images()
-                    ->whereNotIn('image_id', $keepImageIds)
-                    ->update(['status' => 'delete']);
-
-                // B. Handle New & Existing Images
-                foreach ($incomingImages as $imgData) {
-                    $imgId = $imgData['image_id'] ?? ($imgData['id'] ?? null);
-
-                    // Case 1: Existing Image (Has ID)
-                    if ($imgId) {
-                        $imageRecord = $product->images()->where('image_id', $imgId)->first();
-                        
-                        if ($imageRecord) {
-                            $updateData = [
-                                'alt_text' => $imgData['alt_text'] ?? $imageRecord->alt_text,
-                                'sort_order' => $imgData['sort_order'] ?? $imageRecord->sort_order,
-                            ];
-
-                            // Nếu có gửi file mới đè lên ảnh cũ
-                            if (isset($imgData['image_url']) && $imgData['image_url'] instanceof UploadedFile) {
-                                // 1. Lưu file mới vào temp
-                                $file = $imgData['image_url'];
-                                $localPath = $file->store('temp_images', 'public');
-
-                                // 2. Cập nhật record để Worker xử lý file mới
-                                $updateData['image_url'] = null; // Reset link R2 cũ
-                                $updateData['temporary_url'] = $localPath;
-                                $updateData['status'] = 'temporary'; // Kích hoạt Worker
-
-                                // (Tùy chọn) Nếu muốn xóa file cũ trên R2 ngay thì làm ở đây, 
-                                // nhưng tốt nhất để Cron Job lo việc dọn dẹp các file mồ côi sau này.
-                            }
-
-                            $imageRecord->update($updateData);
-                        }
-                    } 
-                    // Case 2: New Image (No ID, has File) -> Async Upload
-                    else if (isset($imgData['image_url']) && $imgData['image_url'] instanceof UploadedFile) {
-                        $file = $imgData['image_url'];
-                        $localPath = $file->store('temp_images', 'public');
-
-                        $product->images()->create([
-                            'image_url' => null,
-                            'temporary_url' => $localPath,
-                            'status' => 'temporary',
-                            'alt_text' => $imgData['alt_text'] ?? null,
-                            'sort_order' => $imgData['sort_order'] ?? 0,
-                        ]);
+                $product->images()->delete();
+                $images = $request->images;
+                foreach ($images as $key => $imageData) {
+                    if ($request->hasFile("images.{$key}.image_url")) {
+                        $url = $this->fileUploadService->upload($request->file("images.{$key}.image_url"));
+                        $images[$key]['image_url'] = $url;
                     }
                 }
+                $product->images()->createMany($images);
             }
 
             // 5. Update Variants (Smart Update: Create, Update, Delete missing)
