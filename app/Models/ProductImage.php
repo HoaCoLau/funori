@@ -19,6 +19,8 @@ class ProductImage extends Model
         'image_url',
         'alt_text',
         'sort_order',
+        'status',
+        'temporary_url',
     ];
 
     public function product()

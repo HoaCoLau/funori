@@ -7,7 +7,9 @@ use App\Models\Product;
 use App\Http\Resources\ProductResource;
 use App\Services\FileUploadService;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
@@ -21,21 +23,26 @@ class ProductController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::with([
-            'categories', 
-            'images', 
-            'variants.attributeValues.attribute', 
-            'specifications', 
-            'collections'
-        ])->paginate(10);
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Lấy danh sách sản phẩm thành công',
-            'data' => ProductResource::collection($products)->response()->getData(true)
-        ]);
+        $page = $request->get('page', 1);
+        $cacheKey = 'products_page_' . $page;
+
+        return Cache::remember($cacheKey, 3600, function () {
+            $products = Product::with([
+                'categories', 
+                'images', 
+                'variants.attributeValues.attribute', 
+                'specifications', 
+                'collections'
+            ])->paginate(10);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Lấy danh sách sản phẩm thành công',
+                'data' => ProductResource::collection($products)->response()->getData(true)
+            ]);
+        });
     }
 
     /**
@@ -93,14 +100,16 @@ class ProductController extends Controller
 
             // 4. Create Images
             if ($request->has('images')) {
-                $images = $request->images;
-                foreach ($images as $key => $imageData) {
-                    if ($request->hasFile("images.{$key}.image_url")) {
-                        $url = $this->fileUploadService->upload($request->file("images.{$key}.image_url"));
-                        $images[$key]['image_url'] = $url;
+                foreach ($request->images as $imgData){
+                    if (isset($imgData['image_url']) && $imgData['image_url'] instanceof UploadedFile ) {
+                        $file = $imgData['image_url'];
+                        $localPath = $file->store('temp_images', 'public');
+                        $imgData['temporary_url']=$localPath;
+                        $imgData['image_url']=null;
+                        $imgData['status']='temporary';
                     }
+                    $product->images()->create($imgData);
                 }
-                $product->images()->createMany($images);
             }
 
             // 5. Create Variants
@@ -121,6 +130,9 @@ class ProductController extends Controller
             }
 
             DB::commit();
+
+            // Clear Cache
+            Cache::flush();
 
             return response()->json([
                 'success' => true,
@@ -143,26 +155,30 @@ class ProductController extends Controller
      */
     public function show(string $id)
     {
-        $product = Product::with([
-            'categories', 
-            'images', 
-            'variants.attributeValues.attribute', 
-            'specifications', 
-            'collections'
-        ])->find($id);
+        $cacheKey = 'product_detail_' . $id;
 
-        if (!$product) {
+        return Cache::remember($cacheKey, 3600, function () use ($id) {
+            $product = Product::with([
+                'categories', 
+                'images', 
+                'variants.attributeValues.attribute', 
+                'specifications', 
+                'collections'
+            ])->find($id);
+
+            if (!$product) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Không tìm thấy sản phẩm',
+                ], 404);
+            }
+
             return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy sản phẩm',
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Lấy chi tiết sản phẩm thành công',
-            'data' => new ProductResource($product)
-        ]);
+                'success' => true,
+                'message' => 'Lấy chi tiết sản phẩm thành công',
+                'data' => new ProductResource($product)
+            ]);
+        });
     }
 
     /**
@@ -224,17 +240,71 @@ class ProductController extends Controller
                 $product->collections()->sync($request->collections);
             }
 
-            // 4. Update Images (Delete all and recreate strategy for simplicity)
+            // 4. Update Images (Async Logic)
             if ($request->has('images')) {
-                $product->images()->delete();
-                $images = $request->images;
-                foreach ($images as $key => $imageData) {
-                    if ($request->hasFile("images.{$key}.image_url")) {
-                        $url = $this->fileUploadService->upload($request->file("images.{$key}.image_url"));
-                        $images[$key]['image_url'] = $url;
+                $incomingImages = $request->images;
+                
+                // Get IDs of images to keep
+                $keepImageIds = collect($incomingImages)
+                    ->map(fn($img) => $img['image_id'] ?? ($img['id'] ?? null))
+                    ->filter()
+                    ->toArray();
+
+                // A. Mark images for deletion (those in DB but not in request)
+                $product->images()
+                    ->whereNotIn('image_id', $keepImageIds)
+                    ->update(['status' => 'delete']);
+
+                // B. Handle New & Existing Images
+                foreach ($incomingImages as $imgData) {
+                    $imgId = $imgData['image_id'] ?? ($imgData['id'] ?? null);
+
+                    // Case 1: Existing Image (Has ID)
+                    if ($imgId) {
+                        $imageRecord = $product->images()->where('image_id', $imgId)->first();
+                        
+                        if ($imageRecord) {
+                            // Nếu có gửi file mới -> XÓA CŨ + TẠO MỚI (Soft Replace)
+                            if (isset($imgData['image_url']) && $imgData['image_url'] instanceof UploadedFile) {
+                                // 1. Đánh dấu ảnh cũ là DELETE (để Cron Job dọn dẹp sạch sẽ trên R2)
+                                $imageRecord->update(['status' => 'delete']);
+
+                                // 2. Tạo ảnh mới hoàn toàn (ID mới)
+                                $file = $imgData['image_url'];
+                                $localPath = $file->store('temp_images', 'public');
+
+                                $product->images()->create([
+                                    'image_url' => null,
+                                    'temporary_url' => $localPath,
+                                    'status' => 'temporary', // Worker sẽ xử lý
+                                    'alt_text' => $imgData['alt_text'] ?? $imageRecord->alt_text,
+                                    'sort_order' => $imgData['sort_order'] ?? $imageRecord->sort_order,
+                                    'is_thumbnail' => $imgData['is_thumbnail'] ?? 0,
+                                ]);
+                            } 
+                            // Nếu KHÔNG gửi file mới -> Chỉ update thông tin
+                            else {
+                                $imageRecord->update([
+                                    'alt_text' => $imgData['alt_text'] ?? $imageRecord->alt_text,
+                                    'sort_order' => $imgData['sort_order'] ?? $imageRecord->sort_order,
+                                ]);
+                            }
+                        }
+                    } 
+                    // Case 2: New Image (No ID, has File) -> Async Upload
+                    else if (isset($imgData['image_url']) && $imgData['image_url'] instanceof UploadedFile) {
+                        $file = $imgData['image_url'];
+                        $localPath = $file->store('temp_images', 'public');
+
+                        $product->images()->create([
+                            'image_url' => null,
+                            'temporary_url' => $localPath,
+                            'status' => 'temporary',
+                            'alt_text' => $imgData['alt_text'] ?? null,
+                            'sort_order' => $imgData['sort_order'] ?? 0,
+                        ]);
                     }
                 }
-                $product->images()->createMany($images);
             }
 
             // 5. Update Variants (Smart Update: Create, Update, Delete missing)
@@ -288,6 +358,10 @@ class ProductController extends Controller
 
             DB::commit();
 
+            // Clear Cache
+            Cache::forget('product_detail_' . $id);
+            Cache::flush();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Cập nhật sản phẩm thành công',
@@ -309,20 +383,13 @@ class ProductController extends Controller
      */
     public function destroy(string $id)
     {
-        $product = Product::find($id);
+        $image = ProductImage::findOrFail($id);
 
-        if (!$product) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy sản phẩm',
-            ], 404);
-        }
-
-        $product->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Xóa sản phẩm thành công',
+        $image->update([
+        'status' => 'delete'
         ]);
+
+        return response()->json(['message' => 'Ảnh đã được đánh dấu xóa']);
+
     }
 }
