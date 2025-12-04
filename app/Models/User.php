@@ -6,8 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
+use Filament\Models\Contracts\HasName; // Import cái này
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser, HasName 
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, HasApiTokens, Notifiable;
@@ -31,6 +34,12 @@ class User extends Authenticatable
     public function getAuthPassword()
     {
         return $this->password_hash;
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        // Chỉ cho phép Role ID = 1 (Admin) truy cập
+        return $this->role_id === 1;
     }
 
     public function role()
@@ -61,5 +70,11 @@ class User extends Authenticatable
     public function reviews()
     {
         return $this->hasMany(Review::class, 'user_id');
+    }
+
+    // Chỉ định tên hiển thị trên Admin Panel
+    public function getFilamentName(): string
+    {
+        return "{$this->first_name} {$this->last_name}";
     }
 }
