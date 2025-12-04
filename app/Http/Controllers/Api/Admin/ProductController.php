@@ -9,7 +9,6 @@ use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
@@ -23,26 +22,21 @@ class ProductController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index()
     {
-        $page = $request->get('page', 1);
-        $cacheKey = 'products_page_' . $page;
-
-        return Cache::remember($cacheKey, 3600, function () {
-            $products = Product::with([
-                'categories', 
-                'images', 
-                'variants.attributeValues.attribute', 
-                'specifications', 
-                'collections'
-            ])->paginate(10);
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Lấy danh sách sản phẩm thành công',
-                'data' => ProductResource::collection($products)->response()->getData(true)
-            ]);
-        });
+        $products = Product::with([
+            'categories', 
+            'images', 
+            'variants.attributeValues.attribute', 
+            'specifications', 
+            'collections'
+        ])->paginate(10);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Lấy danh sách sản phẩm thành công',
+            'data' => ProductResource::collection($products)->response()->getData(true)
+        ]);
     }
 
     /**
@@ -131,9 +125,6 @@ class ProductController extends Controller
 
             DB::commit();
 
-            // Clear Cache
-            Cache::flush();
-
             return response()->json([
                 'success' => true,
                 'message' => 'Tạo sản phẩm thành công',
@@ -155,30 +146,26 @@ class ProductController extends Controller
      */
     public function show(string $id)
     {
-        $cacheKey = 'product_detail_' . $id;
+        $product = Product::with([
+            'categories', 
+            'images', 
+            'variants.attributeValues.attribute', 
+            'specifications', 
+            'collections'
+        ])->find($id);
 
-        return Cache::remember($cacheKey, 3600, function () use ($id) {
-            $product = Product::with([
-                'categories', 
-                'images', 
-                'variants.attributeValues.attribute', 
-                'specifications', 
-                'collections'
-            ])->find($id);
-
-            if (!$product) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Không tìm thấy sản phẩm',
-                ], 404);
-            }
-
+        if (!$product) {
             return response()->json([
-                'success' => true,
-                'message' => 'Lấy chi tiết sản phẩm thành công',
-                'data' => new ProductResource($product)
-            ]);
-        });
+                'success' => false,
+                'message' => 'Không tìm thấy sản phẩm',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lấy chi tiết sản phẩm thành công',
+            'data' => new ProductResource($product)
+        ]);
     }
 
     /**
@@ -357,10 +344,6 @@ class ProductController extends Controller
             }
 
             DB::commit();
-
-            // Clear Cache
-            Cache::forget('product_detail_' . $id);
-            Cache::flush();
 
             return response()->json([
                 'success' => true,
