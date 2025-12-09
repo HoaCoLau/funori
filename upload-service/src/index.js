@@ -4,6 +4,7 @@ const multer = require('multer');
 const fs = require('fs');
 const { uploadQueue } = require('./queue');
 require('./worker'); // Start the worker in the same process for simplicity
+require('./queueWorker'); // Start the Queue worker
 
 const app = express();
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
