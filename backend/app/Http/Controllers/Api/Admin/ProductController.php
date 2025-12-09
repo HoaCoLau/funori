@@ -6,9 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Http\Resources\ProductResource;
 use App\Services\FileUploadService;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+
 
 class ProductController extends Controller
 {
@@ -98,16 +103,34 @@ class ProductController extends Controller
             }
 
             // 4. Create Images
+            $imagesToProcess = [];
             if ($request->has('images')) {
                 foreach ($request->images as $imgData){
                     if (isset($imgData['image_url']) && $imgData['image_url'] instanceof UploadedFile ) {
                         $file = $imgData['image_url'];
-                        $localPath = $file->store('temp_images', 'public');
-                        $imgData['temporary_url']=$localPath;
-                        $imgData['image_url']=null;
-                        $imgData['status']='temporary';
+                        $extension = $file->getClientOriginalExtension();
+                        $filename = \Illuminate\Support\Str::uuid() . '.' . $extension;
+                        
+                        // Save to shared volume using 'shared' disk
+                        \Illuminate\Support\Facades\Storage::disk('shared')->putFileAs(
+                            '', 
+                            $file, 
+                            $filename
+                        );
+
+                        $imgData['temporary_url'] = 'shared_uploads/' . $filename;
+                        $imgData['image_url'] = null;
+                        $imgData['status'] = 'temporary';
                     }
-                    $product->images()->create($imgData);
+                    $newImage = $product->images()->create($imgData);
+                    
+                    if ($newImage->status === 'temporary') {
+                        $imagesToProcess[] = [
+                            'image_id' => $newImage->image_id,
+                            'temporary_url' => $newImage->temporary_url,
+                            'image_url' => null
+                        ];
+                    }
                 }
             }
 
@@ -134,6 +157,19 @@ class ProductController extends Controller
             }
 
             DB::commit();
+            
+            // Trigger Upload Service Batch Process
+            if (!empty($imagesToProcess)) {
+                try {
+                    Http::post('http://upload-service:3000/internal/process-batch', [
+                        'images' => $imagesToProcess
+                    ]);
+                } catch (\Exception $e) {
+                    // Log error but don't fail the request
+                    Log::error('Failed to trigger upload service: ' . $e->getMessage());
+                }
+            }
+
 
             return response()->json([
                 'success' => true,
@@ -242,6 +278,7 @@ class ProductController extends Controller
             }
 
             // 4. Update Images (Async Logic)
+            $imagesToProcess = [];
             if ($request->has('images')) {
                 $incomingImages = $request->images;
                 
@@ -272,16 +309,29 @@ class ProductController extends Controller
 
                                 // 2. Tạo ảnh mới hoàn toàn (ID mới)
                                 $file = $imgData['image_url'];
-                                $localPath = $file->store('temp_images', 'public');
+                                $extension = $file->getClientOriginalExtension();
+                                $filename = \Illuminate\Support\Str::uuid() . '.' . $extension;
+                                
+                                \Illuminate\Support\Facades\Storage::disk('shared')->putFileAs(
+                                    '', 
+                                    $file, 
+                                    $filename
+                                );
 
-                                $product->images()->create([
+                                $newImage = $product->images()->create([
                                     'image_url' => null,
-                                    'temporary_url' => $localPath,
+                                    'temporary_url' => 'shared_uploads/' . $filename,
                                     'status' => 'temporary', // Worker sẽ xử lý
                                     'alt_text' => $imgData['alt_text'] ?? $imageRecord->alt_text,
                                     'sort_order' => $imgData['sort_order'] ?? $imageRecord->sort_order,
                                     'is_thumbnail' => $imgData['is_thumbnail'] ?? 0,
                                 ]);
+
+                                $imagesToProcess[] = [
+                                    'image_id' => $newImage->image_id,
+                                    'temporary_url' => $newImage->temporary_url,
+                                    'image_url' => null
+                                ];
                             } 
                             // Nếu KHÔNG gửi file mới -> Chỉ update thông tin
                             else {
@@ -295,15 +345,28 @@ class ProductController extends Controller
                     // Case 2: New Image (No ID, has File) -> Async Upload
                     else if (isset($imgData['image_url']) && $imgData['image_url'] instanceof UploadedFile) {
                         $file = $imgData['image_url'];
-                        $localPath = $file->store('temp_images', 'public');
+                        $extension = $file->getClientOriginalExtension();
+                        $filename = \Illuminate\Support\Str::uuid() . '.' . $extension;
+                        
+                        \Illuminate\Support\Facades\Storage::disk('shared')->putFileAs(
+                            '', 
+                            $file, 
+                            $filename
+                        );
 
-                        $product->images()->create([
+                        $newImage = $product->images()->create([
                             'image_url' => null,
-                            'temporary_url' => $localPath,
+                            'temporary_url' => 'shared_uploads/' . $filename,
                             'status' => 'temporary',
                             'alt_text' => $imgData['alt_text'] ?? null,
                             'sort_order' => $imgData['sort_order'] ?? 0,
                         ]);
+
+                        $imagesToProcess[] = [
+                            'image_id' => $newImage->image_id,
+                            'temporary_url' => $newImage->temporary_url,
+                            'image_url' => null
+                        ];
                     }
                 }
             }
@@ -369,6 +432,17 @@ class ProductController extends Controller
             }
 
             DB::commit();
+
+            // Trigger Upload Service Batch Process
+            if (!empty($imagesToProcess)) {
+                try {
+                    Http::post('http://upload-service:3000/internal/process-batch', [
+                        'images' => $imagesToProcess
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to trigger upload service: ' . $e->getMessage());
+                }
+            }
 
             // Reload with filter
             $product->load([

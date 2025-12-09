@@ -4,8 +4,16 @@ const { connection } = require('./queue');
 const { Upload } = require('@aws-sdk/lib-storage');
 const s3 = require('./s3');
 const fs = require('fs');
+const { processSingleImage } = require('./worker');
 
 const worker = new Worker('upload-queue', async job => {
+    // Handle DB Image Processing Job
+    if (job.name === 'process-db-image') {
+        console.log(`[Queue] Processing DB Image ID: ${job.data.image_id}`);
+        await processSingleImage(job.data);
+        return;
+    }
+
     const { filePath, originalName, mimeType, customFilename } = job.data;
     
     console.log(`[Queue] Processing upload for ${customFilename || originalName}`);
