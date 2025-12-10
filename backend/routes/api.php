@@ -12,7 +12,6 @@ use App\Http\Controllers\Api\Admin\PostCategoryController;
 use App\Http\Controllers\Api\Admin\PostController;
 use App\Http\Controllers\Api\Admin\ShippingMethodController;
 use App\Http\Controllers\Api\Admin\PaymentMethodController;
-use App\Http\Controllers\Api\Admin\ContactSubmissionController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\OrderController;
 use App\Http\Controllers\Api\Admin\ReviewController;
@@ -29,7 +28,6 @@ use App\Http\Controllers\Api\Client\WishlistController;
 use App\Http\Controllers\Api\Client\ReviewController as ClientReviewController;
 use App\Http\Controllers\Api\Client\PaymentController;
 use App\Http\Controllers\Api\Client\PostController as ClientPostController;
-use App\Http\Controllers\Api\Client\ContactController as ClientContactController;
 
 
 // Admin Routes
@@ -52,8 +50,6 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('posts', PostController::class);
         Route::apiResource('shipping-methods', ShippingMethodController::class);
         Route::apiResource('payment-methods', PaymentMethodController::class);
-        Route::post('contact-submissions/{id}/reply', [ContactSubmissionController::class, 'reply']);
-        Route::apiResource('contact-submissions', ContactSubmissionController::class)->except(['store']);
         Route::apiResource('users', UserController::class)->except(['store']);
         Route::apiResource('orders', OrderController::class)->except(['store', 'destroy']);
         Route::apiResource('reviews', ReviewController::class)->except(['store']);
@@ -62,7 +58,6 @@ Route::prefix('admin')->group(function () {
 });
 
 // Client Public Routes
-Route::post('/contact', [ClientContactController::class, 'store']);
 Route::get('/products', [ClientProductController::class, 'index']);
 Route::get('/products/{id}', [ClientProductController::class, 'show']);
 Route::get('/products/{id}/related', [ClientProductController::class, 'related']);

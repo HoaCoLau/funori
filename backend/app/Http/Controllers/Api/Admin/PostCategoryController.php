@@ -13,16 +13,9 @@ class PostCategoryController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index()
     {
-        $query = PostCategory::with('parent');
-
-        if ($request->has('search') && $request->search != '') {
-            $search = $request->search;
-            $query->where('name', 'like', "%{$search}%");
-        }
-
-        $categories = $query->paginate(20);
+        $categories = PostCategory::with('parent')->paginate(20);
 
         return response()->json([
             'success' => true,
