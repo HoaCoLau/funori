@@ -21,9 +21,27 @@ class PostController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $posts = Post::with(['author', 'category'])->orderBy('created_at', 'desc')->paginate(20);
+        $query = Post::with(['author', 'category']);
+
+        // Search
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $query->where('title', 'like', "%{$search}%");
+        }
+
+        // Filter by Status
+        if ($request->has('status') && $request->status != '') {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by Category
+        if ($request->has('category_id') && $request->category_id != '') {
+            $query->where('post_category_id', $request->category_id);
+        }
+
+        $posts = $query->orderBy('created_at', 'desc')->paginate(20);
 
         return response()->json([
             'success' => true,
