@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../Services/api';
 import { Save, ArrowLeft, Upload, X, Search, ChevronDown } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const CategoryForm = () => {
     const { id } = useParams();
@@ -143,22 +145,40 @@ const CategoryForm = () => {
                 await api.post(`/categories/${id}`, data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
+                toast.success('Category updated successfully');
             } else {
                 await api.post('/categories', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
+                toast.success('Category created successfully');
             }
 
             navigate('/categories');
         } catch (error) {
             console.error('Error saving category:', error);
-            alert(error.response?.data?.message || 'Failed to save category');
+            toast.error(error.response?.data?.message || 'Failed to save category');
         } finally {
             setLoading(false);
         }
     };
 
-    if (initialLoading) return <div>Loading...</div>;
+    if (initialLoading) return (
+        <div className="max-w-4xl mx-auto pb-10">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                    <Skeleton className="h-8 w-48" />
+                </div>
+                <Skeleton className="h-10 w-32 rounded-lg" />
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-40 w-full" />
+            </div>
+        </div>
+    );
 
     return (
         <div className="max-w-4xl mx-auto">

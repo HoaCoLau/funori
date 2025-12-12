@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../Services/api';
 import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const BannerList = () => {
     const navigate = useNavigate();
@@ -49,10 +51,11 @@ const BannerList = () => {
         if (window.confirm('Are you sure you want to delete this banner?')) {
             try {
                 await api.delete(`/banners/${id}`);
+                toast.success('Banner deleted successfully');
                 fetchBanners(pagination.current_page, searchTerm);
             } catch (error) {
                 console.error('Error deleting banner:', error);
-                alert('Failed to delete banner');
+                toast.error('Failed to delete banner');
             }
         }
     };
@@ -98,9 +101,16 @@ const BannerList = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loading ? (
-                                <tr>
-                                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">Loading...</td>
-                                </tr>
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-8" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-10 w-20 rounded" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-32" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-48" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-16" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                    </tr>
+                                ))
                             ) : banners.length > 0 ? (
                                 banners.map(banner => (
                                     <tr key={banner.id} className="hover:bg-gray-50">

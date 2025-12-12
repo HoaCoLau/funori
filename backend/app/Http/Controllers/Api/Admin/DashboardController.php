@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\ProductVariant;
 use App\Models\User;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -40,7 +41,9 @@ class DashboardController extends Controller
         $lowStockCount = ProductVariant::where('stock_quantity', '<', 10)->count();
 
         // 4. Customer Stats
-        $totalCustomers = User::where('role_id', 2)->count();
+        $customerRole = Role::where('role_name', 'Customer')->first();
+        $customerRoleId = $customerRole ? $customerRole->role_id : 3; // Fallback to 3
+        $totalCustomers = User::where('role_id', $customerRoleId)->count();
 
         // 5. Revenue Chart (Last 7 Days)
         // We need to ensure all 7 days are present even if 0 revenue

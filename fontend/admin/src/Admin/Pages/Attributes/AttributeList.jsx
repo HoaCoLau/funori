@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../Services/api';
 import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const AttributeList = () => {
     const [attributes, setAttributes] = useState([]);
@@ -55,10 +57,11 @@ const AttributeList = () => {
         if (window.confirm('Are you sure you want to delete this attribute?')) {
             try {
                 await api.delete(`/attributes/${id}`);
+                toast.success('Attribute deleted successfully');
                 fetchAttributes(pagination.current_page);
             } catch (error) {
                 console.error('Error deleting attribute:', error);
-                alert('Failed to delete attribute');
+                toast.error('Failed to delete attribute');
             }
         }
     };
@@ -102,9 +105,14 @@ const AttributeList = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loading ? (
-                                <tr>
-                                    <td colSpan="4" className="px-6 py-4 text-center text-gray-500">Loading...</td>
-                                </tr>
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-8" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-32" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-48" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                    </tr>
+                                ))
                             ) : attributes.length === 0 ? (
                                 <tr>
                                     <td colSpan="4" className="px-6 py-4 text-center text-gray-500">No attributes found</td>
@@ -129,12 +137,12 @@ const AttributeList = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <Link
+                                            <button
                                                 to={`/attributes/${attr.id}/edit`}
                                                 className="text-indigo-600 hover:text-indigo-900 mr-4"
                                             >
                                                 <Edit size={18} />
-                                            </Link>
+                                            </button>
                                             <button
                                                 onClick={() => handleDelete(attr.id)}
                                                 className="text-red-600 hover:text-red-900"

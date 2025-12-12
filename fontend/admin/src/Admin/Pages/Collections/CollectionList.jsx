@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../Services/api';
 import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const CollectionList = () => {
     const navigate = useNavigate();
@@ -45,10 +47,11 @@ const CollectionList = () => {
         if (window.confirm('Are you sure you want to delete this collection?')) {
             try {
                 await api.delete(`/collections/${id}`);
+                toast.success('Collection deleted successfully');
                 fetchCollections(pagination.current_page);
             } catch (error) {
                 console.error('Error deleting collection:', error);
-                alert('Failed to delete collection');
+                toast.error('Failed to delete collection');
             }
         }
     };
@@ -57,7 +60,7 @@ const CollectionList = () => {
         col.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    if (loading && collections.length === 0) return <div>Loading collections...</div>;
+    // if (loading && collections.length === 0) return <div>Loading collections...</div>;
 
     return (
         <div>
@@ -72,22 +75,19 @@ const CollectionList = () => {
                 </button>
             </div>
 
-            <div className="mb-6">
-                <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Search size={20} className="text-gray-400" />
-                    </span>
-                    <input
-                        type="text"
-                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        placeholder="Search collections..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-            </div>
-
             <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="p-4 border-b border-gray-200">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                        <input
+                            type="text"
+                            placeholder="Search collections..."
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </div>
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -100,7 +100,18 @@ const CollectionList = () => {
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredCollections.length > 0 ? (
+                        {loading ? (
+                            [...Array(5)].map((_, i) => (
+                                <tr key={i}>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-8" /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-10 w-10 rounded" /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-32" /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-24" /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-16" /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                </tr>
+                            ))
+                        ) : filteredCollections.length > 0 ? (
                             filteredCollections.map((col) => (
                                 <tr key={col.id}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

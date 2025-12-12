@@ -27,9 +27,9 @@ class ProductController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::with([
+        $query = Product::with([
             'categories', 
             'images' => function ($query) {
                 $query->where('status', '!=', 'delete');
@@ -37,8 +37,17 @@ class ProductController extends Controller
             'variants.attributeValues.attribute', 
             'specifications', 
             'collections'
-        ])-> orderBy('created_at', 'desc')
-        -> paginate(10);
+        ]);
+
+        if ($request->has('search') && $request->search != '') {
+            $search = mb_strtolower(trim($request->search));
+            $query->where(function($q) use ($search) {
+                $q->whereRaw('LOWER(product_name) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(base_sku) LIKE ?', ["%{$search}%"]);
+            });
+        }
+
+        $products = $query->orderBy('created_at', 'desc')->paginate(10);
         
         return response()->json([
             'success' => true,

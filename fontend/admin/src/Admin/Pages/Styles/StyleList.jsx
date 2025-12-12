@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../Services/api';
 import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const StyleList = () => {
     const navigate = useNavigate();
@@ -46,21 +48,22 @@ const StyleList = () => {
         if (window.confirm('Are you sure you want to delete this style?')) {
             try {
                 await api.delete(`/styles/${id}`);
+                toast.success('Style deleted successfully');
                 fetchStyles(pagination.current_page, searchTerm);
             } catch (error) {
                 console.error('Error deleting style:', error);
-                alert('Failed to delete style');
+                toast.error('Failed to delete style');
             }
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="text-lg text-gray-600">Loading...</div>
-            </div>
-        );
-    }
+    // if (loading) {
+    //     return (
+    //         <div className="flex items-center justify-center h-64">
+    //             <div className="text-lg text-gray-600">Loading...</div>
+    //         </div>
+    //     );
+    // }
 
     return (
         <div className="p-6">
@@ -100,7 +103,16 @@ const StyleList = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {styles.length === 0 ? (
+                            {loading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-8" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-32" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-48" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                    </tr>
+                                ))
+                            ) : styles.length === 0 ? (
                                 <tr>
                                     <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
                                         No styles found

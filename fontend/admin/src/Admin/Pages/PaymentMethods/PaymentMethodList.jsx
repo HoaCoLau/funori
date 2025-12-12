@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../Services/api';
 import { Plus, Edit, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const PaymentMethodList = () => {
     const navigate = useNavigate();
@@ -34,10 +36,11 @@ const PaymentMethodList = () => {
         if (window.confirm('Are you sure you want to delete this payment method?')) {
             try {
                 await api.delete(`/payment-methods/${id}`);
+                toast.success('Payment method deleted successfully');
                 fetchMethods();
             } catch (error) {
                 console.error('Error deleting payment method:', error);
-                alert('Failed to delete payment method');
+                toast.error('Failed to delete payment method');
             }
         }
     };
@@ -68,9 +71,15 @@ const PaymentMethodList = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {loading ? (
-                            <tr>
-                                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">Loading...</td>
-                            </tr>
+                            [...Array(5)].map((_, i) => (
+                                <tr key={i}>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-8" /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-32" /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-24" /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-16" /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                </tr>
+                            ))
                         ) : methods.length > 0 ? (
                             methods.map(item => (
                                 <tr key={item.id} className="hover:bg-gray-50">

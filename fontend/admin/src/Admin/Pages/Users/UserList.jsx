@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../Services/api';
 import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const UserList = () => {
     const navigate = useNavigate();
@@ -49,10 +51,11 @@ const UserList = () => {
         if (window.confirm('Are you sure you want to delete this user?')) {
             try {
                 await api.delete(`/users/${id}`);
+                toast.success('User deleted successfully');
                 fetchUsers(pagination.current_page, searchTerm);
             } catch (error) {
                 console.error('Error deleting user:', error);
-                alert('Failed to delete user');
+                toast.error('Failed to delete user');
             }
         }
     };
@@ -98,9 +101,16 @@ const UserList = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loading ? (
-                                <tr>
-                                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">Loading...</td>
-                                </tr>
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-8" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-32" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-48" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-32" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                    </tr>
+                                ))
                             ) : users.length > 0 ? (
                                 users.map(user => (
                                     <tr key={user.id} className="hover:bg-gray-50">

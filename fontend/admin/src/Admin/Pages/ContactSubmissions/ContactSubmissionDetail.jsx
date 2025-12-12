@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../Services/api';
 import { ArrowLeft, Save } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const ContactSubmissionDetail = () => {
     const navigate = useNavigate();
@@ -33,17 +35,17 @@ const ContactSubmissionDetail = () => {
     const handleStatusUpdate = async () => {
         try {
             await api.put(`/contact-submissions/${id}`, { status });
-            alert('Status updated successfully');
+            toast.success('Status updated successfully');
             navigate('/contact-submissions');
         } catch (error) {
             console.error('Error updating status:', error);
-            alert('Failed to update status');
+            toast.error('Failed to update status');
         }
     };
 
     const handleSendReply = async () => {
         if (!replyMessage.trim()) {
-            alert('Please enter a reply message');
+            toast.error('Please enter a reply message');
             return;
         }
 
@@ -52,18 +54,39 @@ const ContactSubmissionDetail = () => {
         setSendingReply(true);
         try {
             await api.post(`/contact-submissions/${id}/reply`, { message: replyMessage });
-            alert('Reply sent successfully');
+            toast.success('Reply sent successfully');
             setReplyMessage('');
             fetchSubmission(); // Refresh to see updated status
         } catch (error) {
             console.error('Error sending reply:', error);
-            alert('Failed to send reply');
+            toast.error('Failed to send reply');
         } finally {
             setSendingReply(false);
         }
     };
 
-    if (loading) return <div className="p-6">Loading...</div>;
+    if (loading) return (
+        <div className="p-6">
+            <div className="flex items-center mb-6">
+                <Skeleton className="w-8 h-8 rounded-full mr-4" />
+                <Skeleton className="h-8 w-48" />
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-6 max-w-3xl">
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i}>
+                            <Skeleton className="h-4 w-24 mb-2" />
+                            <Skeleton className="h-6 w-full" />
+                        </div>
+                    ))}
+                </div>
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-6 w-full mb-6" />
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-32 w-full" />
+            </div>
+        </div>
+    );
     if (!submission) return <div className="p-6">Submission not found</div>;
 
     return (

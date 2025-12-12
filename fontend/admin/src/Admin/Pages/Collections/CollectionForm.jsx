@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../Services/api';
 import { Save, ArrowLeft, Upload, X, Search, ChevronDown } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const CollectionForm = () => {
     const { id } = useParams();
@@ -144,22 +146,46 @@ const CollectionForm = () => {
                 await api.post(`/collections/${id}`, data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
+                toast.success('Collection updated successfully');
             } else {
                 await api.post('/collections', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
+                toast.success('Collection created successfully');
             }
 
             navigate('/collections');
         } catch (error) {
             console.error('Error saving collection:', error);
-            alert(error.response?.data?.message || 'Failed to save collection');
+            toast.error(error.response?.data?.message || 'Failed to save collection');
         } finally {
             setLoading(false);
         }
     };
 
-    if (initialLoading) return <div>Loading...</div>;
+    if (initialLoading) {
+        return (
+            <div className="max-w-4xl mx-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center">
+                        <Skeleton className="w-8 h-8 mr-4 rounded" />
+                        <Skeleton className="h-8 w-48" />
+                    </div>
+                    <Skeleton className="h-10 w-32 rounded-lg" />
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                    <div className="grid grid-cols-1 gap-6">
+                        {[1, 2, 3, 4].map((i) => (
+                            <div key={i}>
+                                <Skeleton className="h-5 w-32 mb-1" />
+                                <Skeleton className="h-10 w-full rounded-md" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-4xl mx-auto">

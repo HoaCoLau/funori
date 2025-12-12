@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../Services/api';
 import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const PostList = () => {
     const navigate = useNavigate();
@@ -85,10 +87,11 @@ const PostList = () => {
         if (window.confirm('Are you sure you want to delete this post?')) {
             try {
                 await api.delete(`/posts/${id}`);
+                toast.success('Post deleted successfully');
                 fetchPosts(pagination.current_page);
             } catch (error) {
                 console.error('Error deleting post:', error);
-                alert('Failed to delete post');
+                toast.error('Failed to delete post');
             }
         }
     };
@@ -107,8 +110,18 @@ const PostList = () => {
             </div>
 
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between">
-                    <div className="flex flex-col md:flex-row gap-4">
+                <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                        <input
+                            type="text"
+                            placeholder="Search posts..."
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex gap-4">
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
@@ -133,17 +146,6 @@ const PostList = () => {
                             ))}
                         </select>
                     </div>
-
-                    <div className="relative w-full md:w-64">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Search posts..."
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -161,9 +163,17 @@ const PostList = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loading ? (
-                                <tr>
-                                    <td colSpan="7" className="px-6 py-4 text-center text-gray-500">Loading...</td>
-                                </tr>
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-8" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-10 w-10 rounded" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-48" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-16" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                    </tr>
+                                ))
                             ) : posts.length > 0 ? (
                                 posts.map(post => (
                                     <tr key={post.id} className="hover:bg-gray-50">

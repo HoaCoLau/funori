@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../Services/api';
 import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const PostCategoryList = () => {
     const navigate = useNavigate();
@@ -59,10 +61,11 @@ const PostCategoryList = () => {
         if (window.confirm('Are you sure you want to delete this category?')) {
             try {
                 await api.delete(`/post-categories/${id}`);
+                toast.success('Category deleted successfully');
                 fetchCategories(pagination.current_page, searchTerm);
             } catch (error) {
                 console.error('Error deleting category:', error);
-                alert('Failed to delete category');
+                toast.error('Failed to delete category');
             }
         }
     };
@@ -107,9 +110,15 @@ const PostCategoryList = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loading ? (
-                                <tr>
-                                    <td colSpan="5" className="px-6 py-4 text-center text-gray-500">Loading...</td>
-                                </tr>
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-8" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-32" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                    </tr>
+                                ))
                             ) : categories.length > 0 ? (
                                 categories.map(category => (
                                     <tr key={category.post_category_id || category.id} className="hover:bg-gray-50">

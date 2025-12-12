@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../Services/api';
 import { Save, ArrowLeft, Plus, Trash2, Upload, X, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const ProductForm = () => {
     const { id } = useParams();
@@ -31,6 +33,7 @@ const ProductForm = () => {
         base_sku: '',
         description: '',
         base_price: '',
+        is_customizable: true, // Default to active
         categories: [],
         collections: [],
         images: [],
@@ -146,6 +149,7 @@ const ProductForm = () => {
                 base_sku: product.sku,
                 description: product.description || '',
                 base_price: product.base_price,
+                is_customizable: product.is_customizable,
                 categories: product.categories.map(c => c.id),
                 collections: product.collections.map(c => c.id),
                 images: product.images.map(img => ({
@@ -175,7 +179,7 @@ const ProductForm = () => {
 
         } catch (error) {
             console.error('Error fetching product:', error);
-            alert('Failed to load product details');
+            toast.error('Failed to load product details');
             navigate('/products');
         } finally {
             setInitialLoading(false);
@@ -348,6 +352,7 @@ const ProductForm = () => {
             data.append('base_sku', formData.base_sku);
             data.append('description', formData.description);
             data.append('base_price', formData.base_price);
+            data.append('is_customizable', formData.is_customizable ? '1' : '0');
 
             // Arrays need special handling for FormData
             formData.categories.forEach((id, index) => data.append(`categories[${index}]`, id));
@@ -404,22 +409,44 @@ const ProductForm = () => {
                 await api.post(`/products/${id}`, data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
+                toast.success('Product updated successfully');
             } else {
                 await api.post('/products', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
+                toast.success('Product created successfully');
             }
 
             navigate('/products');
         } catch (error) {
             console.error('Error saving product:', error);
-            alert(error.response?.data?.message || 'Failed to save product');
+            toast.error(error.response?.data?.message || 'Failed to save product');
         } finally {
             setLoading(false);
         }
     };
 
-    if (initialLoading) return <div>Loading product details...</div>;
+    if (initialLoading) return (
+        <div className="pb-10">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                    <Skeleton className="h-8 w-48" />
+                </div>
+                <Skeleton className="h-10 w-32 rounded-lg" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <Skeleton className="h-64 w-full rounded-lg" />
+                    <Skeleton className="h-64 w-full rounded-lg" />
+                </div>
+                <div className="space-y-6">
+                    <Skeleton className="h-48 w-full rounded-lg" />
+                    <Skeleton className="h-48 w-full rounded-lg" />
+                </div>
+            </div>
+        </div>
+    );
 
     return (
         <div className="pb-10">
@@ -497,6 +524,19 @@ const ProductForm = () => {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                                     required
                                 />
+                            </div>
+
+                            <div className="flex items-center h-full pt-6">
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        name="is_customizable"
+                                        checked={formData.is_customizable}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, is_customizable: e.target.checked }))}
+                                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                    />
+                                    <span className="ml-2 text-sm text-gray-900">Active Product</span>
+                                </label>
                             </div>
 
                             <div className="col-span-2">

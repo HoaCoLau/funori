@@ -2,12 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../Services/api';
 import { Check, Trash2, Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const ReviewList = () => {
     const navigate = useNavigate();
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [ratingFilter, setRatingFilter] = useState('');
     const [pagination, setPagination] = useState({
         current_page: 1,
         last_page: 1,
@@ -16,16 +20,22 @@ const ReviewList = () => {
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            fetchReviews(1, searchTerm);
+            fetchReviews(1, searchTerm, statusFilter, ratingFilter);
         }, 500);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm]);
+    }, [searchTerm, statusFilter, ratingFilter]);
 
-    const fetchReviews = async (page = 1, search = searchTerm) => {
+    const fetchReviews = async (page = 1, search = searchTerm, status = statusFilter, rating = ratingFilter) => {
         setLoading(true);
         try {
-            const response = await api.get(`/reviews?page=${page}&search=${search}`);
+            const queryParams = new URLSearchParams({
+                page,
+                search,
+                ...(status && { status }),
+                ...(rating && { rating })
+            });
+            const response = await api.get(`/reviews?${queryParams}`);
             const responseData = response.data.data;
             
             const items = responseData.data || responseData;
@@ -49,21 +59,23 @@ const ReviewList = () => {
         if (window.confirm('Are you sure you want to delete this review?')) {
             try {
                 await api.delete(`/reviews/${id}`);
-                fetchReviews(pagination.current_page, searchTerm);
+                toast.success('Review deleted successfully');
+                fetchReviews(pagination.current_page, searchTerm, statusFilter, ratingFilter);
             } catch (error) {
                 console.error('Error deleting review:', error);
-                alert('Failed to delete review');
+                toast.error('Failed to delete review');
             }
         }
     };
 
-    const handleApprove = async (id) => {
+    const handleStatusUpdate = async (id, newStatus) => {
         try {
-            await api.put(`/reviews/${id}/approve`);
-            fetchReviews(pagination.current_page, searchTerm);
+            await api.put(`/reviews/${id}`, { status: newStatus });
+            toast.success(`Review ${newStatus.toLowerCase()} successfully`);
+            fetchReviews(pagination.current_page, searchTerm, statusFilter, ratingFilter);
         } catch (error) {
-            console.error('Error approving review:', error);
-            alert('Failed to approve review');
+            console.error(`Error updating review status:`, error);
+            toast.error(`Failed to update review status`);
         }
     };
 
@@ -74,8 +86,8 @@ const ReviewList = () => {
             </div>
 
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="p-4 border-b border-gray-200">
-                    <div className="relative">
+                <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                         <input
                             type="text"
@@ -84,6 +96,30 @@ const ReviewList = () => {
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
+                    </div>
+                    <div className="flex gap-4">
+                        <select
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                        >
+                            <option value="">All Status</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                        <select
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            value={ratingFilter}
+                            onChange={(e) => setRatingFilter(e.target.value)}
+                        >
+                            <option value="">All Ratings</option>
+                            <option value="5">5 Stars</option>
+                            <option value="4">4 Stars</option>
+                            <option value="3">3 Stars</option>
+                            <option value="2">2 Stars</option>
+                            <option value="1">1 Star</option>
+                        </select>
                     </div>
                 </div>
 
@@ -102,9 +138,17 @@ const ReviewList = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loading ? (
-                                <tr>
-                                    <td colSpan="7" className="px-6 py-4 text-center text-gray-500">Loading...</td>
-                                </tr>
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-8" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-32" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-16" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-48" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-20" /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                    </tr>
+                                ))
                             ) : reviews.length > 0 ? (
                                 reviews.map(review => (
                                     <tr key={review.id} className="hover:bg-gray-50">
@@ -122,27 +166,33 @@ const ReviewList = () => {
                                             {review.comment}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${review.is_approved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                                {review.is_approved ? 'Approved' : 'Pending'}
+                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                review.status === 'Approved' ? 'bg-green-100 text-green-800' : 
+                                                review.status === 'Rejected' ? 'bg-red-100 text-red-800' : 
+                                                'bg-yellow-100 text-yellow-800'
+                                            }`}>
+                                                {review.status}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            {!review.is_approved && (
+                                            {(review.status === 'Pending' || review.status === 'Rejected') && (
                                                 <button 
-                                                    onClick={() => handleApprove(review.id)}
-                                                    className="text-green-600 hover:text-green-900 mr-4"
+                                                    onClick={() => handleStatusUpdate(review.id, 'Approved')}
+                                                    className="text-green-600 hover:text-green-900 mr-3"
                                                     title="Approve"
                                                 >
                                                     <Check size={18} />
                                                 </button>
                                             )}
-                                            <button 
-                                                onClick={() => handleDelete(review.id)}
-                                                className="text-red-600 hover:text-red-900"
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                            {(review.status === 'Pending' || review.status === 'Approved') && (
+                                                <button 
+                                                    onClick={() => handleStatusUpdate(review.id, 'Rejected')}
+                                                    className="text-orange-600 hover:text-orange-900 mr-3"
+                                                    title="Reject"
+                                                >
+                                                    <X size={18} />
+                                                </button>
+                                            )} 
                                         </td>
                                     </tr>
                                 ))

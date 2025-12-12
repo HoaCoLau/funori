@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../Services/api';
 import { Save, ArrowLeft } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Skeleton from '../../Components/Skeleton';
 
 const OrderDetail = () => {
     const navigate = useNavigate();
@@ -33,15 +35,45 @@ const OrderDetail = () => {
     const handleStatusChange = async () => {
         try {
             await api.put(`/orders/${id}/status`, { status });
-            alert('Order status updated successfully');
+            toast.success('Order status updated successfully');
             fetchOrder();
         } catch (error) {
             console.error('Error updating status:', error);
-            alert('Failed to update status');
+            toast.error('Failed to update status');
         }
     };
 
-    if (loading) return <div className="p-6">Loading...</div>;
+    if (loading) return (
+        <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                    <Skeleton className="w-8 h-8 rounded-full" />
+                    <Skeleton className="h-8 w-48" />
+                </div>
+                <div className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-32 rounded-lg" />
+                    <Skeleton className="h-10 w-32 rounded-lg" />
+                </div>
+            </div>
+            <div className="grid grid-cols-3 gap-6">
+                <div className="col-span-2 space-y-6">
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                        <Skeleton className="h-6 w-32 mb-4" />
+                        <div className="space-y-4">
+                            <Skeleton className="h-16 w-full" />
+                            <Skeleton className="h-16 w-full" />
+                        </div>
+                    </div>
+                </div>
+                <div className="space-y-6">
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                        <Skeleton className="h-6 w-32 mb-4" />
+                        <Skeleton className="h-24 w-full" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
     if (!order) return <div className="p-6">Order not found</div>;
 
     return (
