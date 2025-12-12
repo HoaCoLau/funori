@@ -21,6 +21,7 @@ services:
             - '.:/var/www/html'
             - './docker/8.4/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf'
             - './docker/8.4/nginx.conf:/etc/nginx/sites-available/default'
+            - '../shared_uploads:/var/www/html/storage/app/shared_uploads'
         networks:
             - sail
         depends_on:
@@ -93,12 +94,12 @@ services:
             context: ../upload-service
             dockerfile: Dockerfile
         volumes:
-            - './storage/app/public:/var/www/html/storage/app/public'
+            - '../shared_uploads:/app/shared_uploads'
             - '../upload-service:/app' 
         ports:
-            - '3000:3000'
+            - '3002:3000'
         environment:
-            LARAVEL_STORAGE_PATH: '/var/www/html/storage/app/public'
+            LARAVEL_STORAGE_PATH: '/app'
             DB_HOST: 'mysql'
             PORT: 3000
             AWS_URL: '${AWS_URL}'
@@ -112,6 +113,7 @@ services:
             - sail
         depends_on:
             - redis
+            - mysql
 
     admin-frontend:
         build:

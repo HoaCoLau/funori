@@ -13,12 +13,27 @@ class ReviewController extends Controller
     {
         $query = Review::with(['user', 'product']);
 
-        if ($request->has('status')) {
+        if ($request->has('status') && $request->status != '') {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('product_id')) {
-            $query->where('product_id', $request->product_id);
+        if ($request->has('rating') && $request->rating != '') {
+            $query->where('rating', $request->rating);
+        }
+
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('comment', 'like', "%{$search}%")
+                  ->orWhere('review_id', 'like', "%{$search}%")
+                  ->orWhereHas('user', function($q) use ($search) {
+                      $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('product', function($q) use ($search) {
+                      $q->where('product_name', 'like', "%{$search}%");
+                  });
+            });
         }
 
         $reviews = $query->orderBy('created_at', 'desc')->paginate(10);

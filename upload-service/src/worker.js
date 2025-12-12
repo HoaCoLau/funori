@@ -89,31 +89,37 @@ async function processSingleImage(image) {
     }
 }
 
-async function processImages() {
-    try {
-        // Lấy ảnh
-        const [rows] = await pool.execute(
-            "SELECT image_id, temporary_url, image_url FROM product_images WHERE status = 'temporary' AND temporary_url IS NOT NULL LIMIT 10000"
-        );
+// async function processImages() {
+//     try {
+//         // Lấy ảnh
+//         const [rows] = await pool.execute(
+//             "SELECT image_id, temporary_url, image_url FROM product_images WHERE status = 'temporary' AND temporary_url IS NOT NULL LIMIT 10000"
+//         );
 
-        if (rows.length === 0) {
-            return setTimeout(processImages, 2000);
-        }
+//         if (rows.length === 0) {
+//             return setTimeout(processImages, 2000);
+//         }
 
-        console.log(`Found ${rows.length} images. Processing in PARALLEL...`);
+//         console.log(`Found ${rows.length} images. Processing in PARALLEL...`);
 
-        // Chạy song song tất cả ảnh cùng lúc
-        const promises = rows.map(image => processSingleImage(image));
-        await Promise.all(promises);
+//         // Chạy song song tất cả ảnh cùng lúc
+//         const promises = rows.map(image => processSingleImage(image));
+//         await Promise.all(promises);
         
-        // Xử lý xong đợt này thì làm ngay đợt tiếp theo
-        processImages();
+//         // Xử lý xong đợt này thì làm ngay đợt tiếp theo
+//         processImages();
 
-    } catch (error) {
-        console.error('Worker error:', error);
-        setTimeout(processImages, 5000);
-    }
-}
+//     } catch (error) {
+//         console.error('Worker error:', error);
+//         // setTimeout(processImages, 5000); // Disable polling fallback for now
+//     }
+// }
 
-console.log('Starting High-Performance Image Upload Worker...');
-processImages();
+// console.log('Starting High-Performance Image Upload Worker...');
+// processImages();
+
+module.exports = { processSingleImage };
+
+
+
+
